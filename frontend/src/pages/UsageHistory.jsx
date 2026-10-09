@@ -1,0 +1,437 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { History, Activity, AlertTriangle, Filter, ArrowUpDown, Check, RotateCcw, ChevronDown } from 'lucide-react';
+import api from '../api';
+
+export default function UsageHistory() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Filter & Sort States
+  const [sortBy, setSortBy] = useState('date-desc'); // date-desc, date-asc, vol-desc, vol-asc
+  const [filterStatus, setFilterStatus] = useState('all'); // all, normal, overuse
+  const [filterMonth, setFilterMonth] = useState('all'); // all, 1-12
+  const [filterYear, setFilterYear] = useState('all'); // all, years...
+
+  // Mobile Filter Drawer States
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileSortOpen, setMobileSortOpen] = useState(false);
+
+  const [monthlyLimit, setMonthlyLimit] = useState(10000);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          const houseNumber = localStorage.getItem('houseNumber');
+          const username = localStorage.getItem('username');
+          if (!houseNumber) { setLoading(false); return; }
+
+          const [res, profileRes] = await Promise.all([
+            api.get(`/usage/household/${houseNumber}`),
+            username ? api.get(`/users/profile/${username}`) : Promise.resolve({ data: null })
+          ]);
+
+          setLogs(res.data || []);
+          if (profileRes.data && profileRes.data.monthlyLimitLiters) {
+            setMonthlyLimit(profileRes.data.monthlyLimitLiters);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching usage history:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, []);
+
+  const calculateEffectiveStatus = (log) => {
+    const type = (log.logType || 'DAILY').toUpperCase();
+    let threshold = monthlyLimit / 30; // Daily threshold
+
+    if (type === 'WEEKLY') {
+      threshold = (monthlyLimit / 30) * 7;
+    } else if (type === 'MONTHLY') {
+      threshold = monthlyLimit;
+    }
+
+    return log.readingLiters > threshold ? 'OVERUSE' : 'NORMAL';
+  };
+
+  const getStatusColor = (isOveruse) => {
+    if (isOveruse) {
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    }
+    return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+  };
+
+  // Derive unique years dynamically from logs
+  const availableYears = Array.from(
+    new Set(logs.map(log => new Date(log.readingDate).getFullYear()))
+  ).sort((a, b) => b - a);
+
+  const isFilterActive = filterMonth !== 'all' || filterYear !== 'all' || filterStatus !== 'all';
+
+  // Derived state: Filtered & Sorted Logs
+  const filteredAndSortedLogs = logs
+    .filter(log => {
+      const d = new Date(log.readingDate);
+      const matchesStatus = filterStatus === 'all' || 
+        (log.status ? log.status.toLowerCase() : 'normal') === filterStatus.toLowerCase();
+      const matchesMonth = filterMonth === 'all' || 
+        (d.getMonth() + 1) === parseInt(filterMonth, 10);
+      const matchesYear = filterYear === 'all' || 
+        d.getFullYear() === parseInt(filterYear, 10);
+      return matchesStatus && matchesMonth && matchesYear;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'date-desc') {
+        return new Date(b.readingDate) - new Date(a.readingDate);
+      }
+      if (sortBy === 'date-asc') {
+        return new Date(a.readingDate) - new Date(b.readingDate);
+      }
+      if (sortBy === 'vol-desc') {
+        return b.readingLiters - a.readingLiters;
+      }
+      if (sortBy === 'vol-asc') {
+        return a.readingLiters - b.readingLiters;
+      }
+      return 0;
+    });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text">Usage History</h1>
+          <p className="text-text-muted mt-1">Detailed breakdown of your daily water consumption.</p>
+        </div>
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <History className="w-5 h-5 text-text-muted" />
+            <h3 className="font-semibold text-text">Meter Readings Log</h3>
+          </div>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+            Total Logs: {filteredAndSortedLogs.length}
+          </span>
+        </div>
+
+        {/* DESKTOP FILTER CONTROLS (Hidden on Smartphone) */}
+        <div className="hidden sm:grid sm:grid-cols-4 gap-4 p-6 border-b border-border bg-surface-lighter/20">
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Filter by Month
+            </label>
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Months</option>
+              {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                <option key={mName} value={idx + 1}>{mName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Filter by Year
+            </label>
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Status Filter
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Statuses</option>
+              <option value="normal">Normal</option>
+              <option value="overuse">Overuse</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <ArrowUpDown className="w-3 h-3 text-primary" /> Sort Order
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="vol-desc">Highest Usage</option>
+              <option value="vol-asc">Lowest Usage</option>
+            </select>
+          </div>
+        </div>
+
+        {/* SMARTPHONE FILTER & SORT CONTROLS (Single Row with Collapsible Drawer) */}
+        <div className="sm:hidden p-3.5 border-b border-border bg-surface-lighter/30 space-y-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={() => {
+                setMobileSortOpen(!mobileSortOpen);
+                setMobileFilterOpen(false);
+              }}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-extrabold transition-all active:scale-95 cursor-pointer ${
+                mobileSortOpen || sortBy !== 'date-desc'
+                  ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                  : 'bg-surface/90 border-border text-text'
+              }`}
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-primary" />
+              <span>Sort</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileSortOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileFilterOpen(!mobileFilterOpen);
+                setMobileSortOpen(false);
+              }}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-extrabold transition-all active:scale-95 cursor-pointer relative ${
+                mobileFilterOpen || isFilterActive
+                  ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                  : 'bg-surface/90 border-border text-text'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5 text-primary" />
+              <span>Filter</span>
+              {isFilterActive && (
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Smartphone Sort Panel */}
+          <AnimatePresence>
+            {mobileSortOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden bg-surface p-3.5 rounded-2xl border border-primary/20 space-y-2.5 shadow-xl"
+              >
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">Sort Readings By</span>
+                  <button onClick={() => setMobileSortOpen(false)} className="text-xs font-extrabold text-primary">Done</button>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'date-desc', label: '📅 Newest First' },
+                    { id: 'date-asc', label: '📅 Oldest First' },
+                    { id: 'vol-desc', label: '💧 Highest Usage First' },
+                    { id: 'vol-asc', label: '💧 Lowest Usage First' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSortBy(opt.id);
+                        setMobileSortOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                        sortBy === opt.id
+                          ? 'bg-primary text-white shadow-md'
+                          : 'bg-surface-lighter/60 text-text hover:bg-surface-lighter'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {sortBy === opt.id && <Check className="w-4 h-4" />}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Smartphone Filter Panel */}
+          <AnimatePresence>
+            {mobileFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden bg-surface p-4 rounded-2xl border border-primary/20 space-y-3 shadow-xl"
+              >
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">Filter Reading Logs</span>
+                  {isFilterActive && (
+                    <button
+                      onClick={() => {
+                        setFilterMonth('all');
+                        setFilterYear('all');
+                        setFilterStatus('all');
+                      }}
+                      className="text-xs font-extrabold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Reset All
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* By Month */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Month</label>
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Months</option>
+                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                        <option key={mName} value={idx + 1}>{mName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* By Year */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Year</label>
+                    <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Years</option>
+                      {availableYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* By Status */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="normal">Normal</option>
+                      <option value="overuse">Overuse</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => setMobileFilterOpen(false)}
+                    className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl font-extrabold text-xs shadow-md mt-1 cursor-pointer"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        {loading ? (
+          <div className="p-6 space-y-4">
+            <div className="h-10 w-full rounded-lg skeleton-pulse" />
+            <div className="h-12 w-full rounded-lg skeleton-pulse" />
+            <div className="h-12 w-full rounded-lg skeleton-pulse" />
+          </div>
+        ) : filteredAndSortedLogs.length === 0 ? (
+          <div className="py-20 px-12 text-center text-text-muted flex flex-col items-center justify-center min-h-[360px]">
+            <img src="/history.svg" alt="No History" className="w-44 h-44 mb-4 object-contain opacity-90" />
+            <p className="font-bold text-base text-text">No usage history matches the selected filters.</p>
+            <p className="text-xs text-text-muted mt-1">Try resetting the dropdown filters to see all readings.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-lighter/50 border-b border-border text-sm text-text-muted">
+                  <th className="p-4 font-medium">Log ID</th>
+                  <th className="p-4 font-medium">Reading Date</th>
+                  <th className="p-4 font-medium">Log Type</th>
+                  <th className="p-4 font-medium">Volume (Liters)</th>
+                  <th className="p-4 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAndSortedLogs.map((log, index) => {
+                  const typeLabel = (log.logType || 'DAILY').toUpperCase();
+                  const typeBadgeStyle = 
+                    typeLabel === 'MONTHLY' 
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
+                      : typeLabel === 'WEEKLY'
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      : 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+
+                  return (
+                    <motion.tr 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(index * 0.03, 0.5) }}
+                      key={log.id} 
+                      className="border-b border-border/50 hover:bg-surface-lighter/30 transition-colors"
+                    >
+                      <td className="p-4 font-medium text-text">#{log.id.toString().padStart(5, '0')}</td>
+                      <td className="p-4 text-text-muted">
+                        {new Date(log.readingDate).toLocaleDateString('en-US', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${typeBadgeStyle}`}>
+                          {typeLabel}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-text">{log.readingLiters.toLocaleString()} L</td>
+                      <td className="p-4">
+                        {(() => {
+                          const effectiveStatus = calculateEffectiveStatus(log);
+                          const isOveruse = effectiveStatus === 'OVERUSE';
+                          return (
+                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(isOveruse)}`}>
+                              {isOveruse && <AlertTriangle className="w-3.5 h-3.5" />}
+                              {isOveruse ? 'Overuse' : 'Normal'}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}

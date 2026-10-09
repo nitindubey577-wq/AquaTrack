@@ -1,0 +1,613 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Droplet, ArrowRight, Shield, BarChart3, Users, Zap, CheckCircle2, Sun, Moon, Sparkles, Globe, ChevronDown, CheckCheck, Search } from 'lucide-react';
+import SharedHeader from '../components/SharedHeader';
+
+function FeaturePanelCard({ icon: Icon, title, subtitle, blobsColor, cardType }) {
+  return (
+    <div style={{ perspective: '1000px' }} className="w-full max-w-[420px] mx-auto">
+      <motion.div 
+        whileHover={{ rotateY: -8, rotateX: 6, scale: 1.02 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className={`panel-container card-${cardType}`}
+      >
+        <div className="blobs">
+          <span className="blob" style={{ backgroundColor: blobsColor[0] }}></span>
+          <span className="blob" style={{ backgroundColor: blobsColor[1] }}></span>
+          <span className="blob" style={{ backgroundColor: blobsColor[2] }}></span>
+          <span className="blob" style={{ backgroundColor: blobsColor[3] }}></span>
+          <span className="blob" style={{ backgroundColor: blobsColor[4] }}></span>
+        </div>
+        <svg className="noise" width="420" height="210" xmlns="http://www.w3.org/2000/svg">
+          <filter id="noise-effect">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="1" stitchTiles="stitch"></feTurbulence>
+          </filter>
+          <rect width="100%" height="100%" filter="url(#noise-effect)"></rect>
+        </svg>
+        <div className="panel-main">
+          <div className="panel-content">
+            <div className="panel-content-top">
+              <div className="flex items-center gap-3">
+                <div className="icon-box w-8 h-8 rounded-lg flex items-center justify-center">
+                  <Icon className="w-4.5 h-4.5 icon-element" />
+                </div>
+                <p className="title">{title}</p>
+              </div>
+              <p className="subtitle mt-3">{subtitle}</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function Landing() {
+  const [valveClosed, setValveClosed] = React.useState(false);
+  const [theme, setTheme] = React.useState(() => {
+    return localStorage.getItem('theme') || document.documentElement.getAttribute('data-theme') || 'dark';
+  });
+
+  // Sync data-theme attribute on mount
+  React.useEffect(() => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    setTheme(currentTheme);
+  }, []);
+
+  const [bgType, setBgType] = React.useState(() => {
+    return localStorage.getItem('landing-bg-type') || 'modern';
+  });
+
+  // Language state & dropRef
+  const [currentLang, setCurrentLang] = useState(() => (localStorage.getItem('selectedLang') || 'en').toLowerCase());
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [langSearchQuery, setLangSearchQuery] = useState('');
+  const langRef = useRef(null);
+
+  const languages = [
+    { code: 'en', name: 'English (Default)', flag: '🇬🇧' },
+    { code: 'hi', name: 'हिंदी (Hindi)', flag: '🇮🇳' },
+    { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇮🇳' },
+    { code: 'te', name: 'తెలుగు (Telugu)', flag: '🇮🇳' },
+    { code: 'mr', name: 'मराठी (Marathi)', flag: '🇮🇳' },
+    { code: 'ta', name: 'தமிழ் (Tamil)', flag: '🇮🇳' },
+    { code: 'ur', name: 'اردو (Urdu)', flag: '🇮🇳' },
+    { code: 'gu', name: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' },
+    { code: 'kn', name: 'ಕನ್ನಡ (Kannada)', flag: '🇮🇳' },
+    { code: 'ml', name: 'മലയാളം (Malayalam)', flag: '🇮🇳' },
+    { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)', flag: '🇮🇳' },
+    { code: 'or', name: 'ଓଡ଼ିଆ (Odia)', flag: '🇮🇳' },
+    { code: 'as', name: 'অসমীয়া (Assamese)', flag: '🇮🇳' },
+  ];
+
+  // Language display: sync in real-time from SharedHeader changes
+  // `storage` only fires in OTHER tabs, so we use a custom event + polling fallback
+  useEffect(() => {
+    const syncLang = () => {
+      const lang = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+      setCurrentLang(lang);
+    };
+
+    // Custom event dispatched by SharedHeader on same-tab language change
+    window.addEventListener('aquatrack-lang-change', syncLang);
+    // Cross-tab support via storage event
+    window.addEventListener('storage', syncLang);
+
+    // Polling fallback: check every 300ms for changes made without events
+    let lastLang = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+    const pollId = setInterval(() => {
+      const cur = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+      if (cur !== lastLang) {
+        lastLang = cur;
+        setCurrentLang(cur);
+      }
+    }, 300);
+
+    return () => {
+      window.removeEventListener('aquatrack-lang-change', syncLang);
+      window.removeEventListener('storage', syncLang);
+      clearInterval(pollId);
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+  };
+
+  const handleBgTypeChange = (type) => {
+    setBgType(type);
+    localStorage.setItem('landing-bg-type', type);
+  };
+
+  React.useEffect(() => {
+    if (bgType !== 'liquid') return;
+
+    // Skip loading WebGL/Three.js liquid background on mobile to prevent performance lag
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+    if (isMobile) return;
+
+    let app = null;
+    const initLiquid = async () => {
+      try {
+        const module = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/threejs-components@0.0.27/build/backgrounds/liquid1.min.js');
+        const LiquidBackground = module.default;
+        const canvas = document.getElementById('liquid-canvas');
+        if (canvas) {
+          app = LiquidBackground(canvas);
+          // Load the colorful liquid glass pattern
+          app.loadImage('/liquid_glass_bg.png');
+          app.liquidPlane.material.metalness = 0.4;
+          app.liquidPlane.material.roughness = 0.3;
+          app.liquidPlane.uniforms.displacementScale.value = 4;
+          app.setRain(false);
+        }
+      } catch (err) {
+        console.error("Failed to load LiquidBackground:", err);
+      }
+    };
+
+    initLiquid();
+
+    return () => {
+      if (app) {
+        try {
+          if (typeof app.destroy === 'function') {
+            app.destroy();
+          }
+        } catch (e) {
+          console.error("Error during LiquidBackground destroy:", e);
+        }
+      }
+    };
+  }, [bgType]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15, delayChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }
+  };
+
+  const fadeUpVariants = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+  };
+
+  const slogans = [
+    "💧 Every Drop Counts",
+    "🌍 Save Water, Save the Planet",
+    "🌱 Conserve for the Future",
+    "⚡ Smart Billing, Zero Wastage",
+    "💧 Be Water Wise",
+    "📊 Track. Analyze. Conserve."
+  ];
+
+  return (
+    <div className="min-h-screen bg-transparent relative overflow-hidden flex flex-col items-center selection:bg-primary/30 scroll-smooth pb-20 lg:pb-0">
+      {/* Hidden Google Translate container for Landing Page */}
+      <div id="google_translate_element_landing" className="hidden" />
+
+      {/* Liquid Background Canvas */}
+      <canvas 
+        id="liquid-canvas" 
+        className={`hidden md:block absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-700 ${
+          bgType === 'liquid' ? 'opacity-80 z-0' : 'opacity-0 z-[-1]'
+        }`} 
+      />
+
+      {/* Modern High Quality Background Elements */}
+      <div className={`absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-700 z-0 ${
+        bgType === 'modern' ? 'opacity-100' : 'opacity-0'
+      }`}>
+        {/* Soft Radial Ambient Lighting */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400/30 via-transparent to-transparent dark:from-primary/10 pointer-events-none" />
+      </div>
+
+      {/* Shared Glassmorphic Header */}
+      <SharedHeader activeTab="home" />
+
+      {/* Hero Section */}
+      <motion.section 
+        id="hero"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="z-10 w-full px-6 max-w-7xl mx-auto pt-16 pb-28 md:pt-24 md:pb-36 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh] scroll-mt-24"
+      >
+        <div className="flex-1 text-center lg:text-left">
+          <motion.h1
+            variants={itemVariants}
+            className={`tracking-tight mb-6 ${
+              currentLang === 'en'
+                ? 'leading-[1.1] text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] xl:text-[4rem]'
+                : 'leading-[1.6] text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-black text-text'
+            }`}
+          >
+            {currentLang === 'en' ? (
+              <>
+                <span className="block font-bonny bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 dark:from-white dark:via-slate-100 dark:to-blue-100 bg-clip-text text-transparent drop-shadow-sm pb-1 sm:pb-2">
+                  Smart Water Management
+                </span>
+                <span className="notranslate inline-flex flex-wrap items-baseline font-dancing text-[1.15em] leading-tight pt-1">
+                  <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-sky-400 dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
+                    For
+                  </span>
+                  <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-sky-400 dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
+                    <span>C</span>
+                    <motion.span
+                      animate={{ y: [0, -2, 0], scale: [1, 1.04, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      className="inline-flex items-baseline relative mx-[0.02em] self-baseline"
+                    >
+                      <svg
+                        viewBox="0 0 100 100"
+                        className="w-[0.58em] h-[0.64em] inline-block overflow-visible drop-shadow-[0_4px_10px_rgba(37,99,235,0.45)]"
+                        style={{ verticalAlign: 'baseline', transform: 'translateY(0.04em)' }}
+                      >
+                        <defs>
+                          <linearGradient id="oDropletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#38bdf8" />
+                            <stop offset="40%" stopColor="#2563eb" />
+                            <stop offset="85%" stopColor="#1d4ed8" />
+                            <stop offset="100%" stopColor="#1e3a8a" />
+                          </linearGradient>
+                          <linearGradient id="oDropletRim" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.4" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M 50,4 C 54,4 94,28 94,54 C 94,79 74,96 50,96 C 26,96 6,79 6,54 C 6,28 46,4 50,4 Z" fill="url(#oDropletGrad)" stroke="url(#oDropletRim)" strokeWidth="3.5" />
+                        <path d="M 28,40 C 22,50 22,66 28,75" fill="none" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" opacity="0.85" />
+                        <ellipse cx="48" cy="22" rx="4" ry="5" fill="#ffffff" opacity="0.9" transform="rotate(-15 48 22)" />
+                      </svg>
+                    </motion.span>
+                    <span>mmunities..</span>
+                  </span>
+                </span>
+              </>
+            ) : (
+              // Non-English: show full heading from local dictionary (correct word order, no overflow SVG)
+              (() => {
+                const headings = {
+                  // ── Indian & South Asian ──
+                  hi: ['स्मार्ट जल प्रबंधन', 'समुदायों के लिए'],
+                  bn: ['স্মার্ট জল ব্যবস্থাপনা', 'সম্প্রদায়গুলির জন্য'],
+                  te: ['స్మార్ట్ వాటర్ మేనేజ్‌మెంట్', 'కమ్యూనిటీల కోసం'],
+                  mr: ['स्मार्ट जल व्यवस्थापन', 'समुदायांसाठी'],
+                  ta: ['ஸ்மார்ட் நீர் மேலாண்மை', 'சமூகங்களுக்காக'],
+                  ur: ['سمارٹ واٹر مینجمنٹ', 'برادریوں کے لیے'],
+                  gu: ['સ્માર્ટ વોટર મેનેજમેન્ટ', 'સમુદાયો માટે'],
+                  kn: ['ಸ್ಮಾರ್ಟ್ ವಾಟರ್ ಮ್ಯಾನೇಜ್‌ಮೆಂಟ್', 'ಸಮುದಾಯಗಳಿಗಾಗಿ'],
+                  ml: ['സ്മാർട്ട് ജല മാനേജ്മെന്റ്', 'സമൂഹങ്ങൾക്കായി'],
+                  pa: ['ਸਮਾਰਟ ਵਾਟਰ ਮੈਨੇਜਮੈਂਟ', 'ਭਾਈਚਾਰਿਆਂ ਲਈ'],
+                  or: ['ସ୍ମାର୍ଟ ଜଳ ପରିଚାଳନା', 'ସମ୍ପ୍ରଦାୟ ପାଇଁ'],
+                  as: ['স্মাৰ্ট পানী ব্যৱস্থাপনা', 'সম্প্ৰদায়ৰ বাবে'],
+                  sa: ['स्मार्ट जलप्रबन्धनम्', 'समुदायेभ्यः'],
+                  ne: ['स्मार्ट पानी व्यवस्थापन', 'समुदायहरूका लागि'],
+                  si: ['ද්‍රව්‍ය ජල කළමනාකරණය', 'ප්‍රජාවන් සඳහා'],
+                  // ── European ──
+                  es: ['Gestión Inteligente del Agua', 'Para Comunidades'],
+                  fr: ["Gestion Intelligente de l'Eau", 'Pour les Communautés'],
+                  de: ['Intelligentes Wassermanagement', 'Für Gemeinschaften'],
+                  it: ["Gestione Intelligente dell'Acqua", 'Per le Comunità'],
+                  pt: ['Gestão Inteligente da Água', 'Para Comunidades'],
+                  ru: ['Умное Управление Водой', 'Для Сообществ'],
+                  nl: ['Slim Waterbeheer', 'Voor Gemeenschappen'],
+                  pl: ['Inteligentne Zarządzanie Wodą', 'Dla Społeczności'],
+                  uk: ['Розумне Управління Водою', 'Для Спільнот'],
+                  sv: ['Smart Vattenhantering', 'För Gemenskaper'],
+                  el: ['Έξυπνη Διαχείριση Νερού', 'Για Κοινότητες'],
+                  ro: ['Management Inteligent al Apei', 'Pentru Comunități'],
+                  hu: ['Okos Vízgazdálkodás', 'Közösségek Számára'],
+                  cs: ['Chytré Řízení Vody', 'Pro Komunity'],
+                  da: ['Smart Vandforvaltning', 'Til Fællesskaber'],
+                  fi: ['Älykäs Vedenhallinta', 'Yhteisöille'],
+                  no: ['Smart Vannforvaltning', 'For Samfunn'],
+                  tr: ['Akıllı Su Yönetimi', 'Topluluklar İçin'],
+                  // ── East & Southeast Asian ──
+                  'zh-cn': ['智能水资源管理', '为社区服务'],
+                  'zh-tw': ['智能水資源管理', '為社區服務'],
+                  ja: ['スマート水管理', 'コミュニティのために'],
+                  ko: ['스마트 물 관리', '커뮤니티를 위한'],
+                  vi: ['Quản Lý Nước Thông Minh', 'Cho Cộng Đồng'],
+                  th: ['การจัดการน้ำอัจฉริยะ', 'สำหรับชุมชน'],
+                  id: ['Manajemen Air Cerdas', 'Untuk Komunitas'],
+                  ms: ['Pengurusan Air Pintar', 'Untuk Komuniti'],
+                  tl: ['Matalinong Pamamahala ng Tubig', 'Para sa Komunidad'],
+                  // ── Middle Eastern & African ──
+                  ar: ['إدارة المياه الذكية', 'للمجتمعات'],
+                  fa: ['مدیریت هوشمند آب', 'برای جوامع'],
+                  he: ['ניהול מים חכם', 'לקהילות'],
+                  sw: ['Usimamizi wa Maji wa Akili', 'Kwa Jamii'],
+                };
+                const [line1, line2] = headings[currentLang] || headings[currentLang?.toLowerCase()] || ['Smart Water Management', 'For Communities'];
+                return (
+                  <>
+                    <span className="notranslate block leading-[1.5] py-1">{line1}</span>
+                    <span className="notranslate block leading-[1.5] py-1 bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                      {line2}
+                    </span>
+                  </>
+                );
+              })()
+            )}
+          </motion.h1>
+
+          <motion.p variants={itemVariants} className="font-jakarta text-base sm:text-lg md:text-xl text-text/85 dark:text-slate-300 font-medium mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed tracking-wide px-4 lg:px-0">
+            Monitor household consumption, allocate shared costs fairly, and conserve water with our intelligent analytics and automated billing platform.
+          </motion.p>
+
+          <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 w-full sm:w-auto px-4 lg:px-0">
+            <Link to="/register" className="w-full sm:w-52">
+              <button className="btn-liquid-bubble-blue w-full">
+                <span className="btn-liquid-bubble-text">Get Started</span>
+                <div className="btn-liquid-bubble-liquid">
+                  <div className="btn-liquid-bubble-bubble"></div>
+                  <div className="btn-liquid-bubble-bubble"></div>
+                  <div className="btn-liquid-bubble-bubble"></div>
+                  <div className="btn-liquid-bubble-bubble"></div>
+                  <div className="btn-liquid-bubble-bubble"></div>
+                  <div className="btn-liquid-bubble-bubble"></div>
+                </div>
+              </button>
+            </Link>
+            <Link to="/login" className="w-full sm:w-52">
+              <button className="h-[58px] min-h-[58px] w-full px-10 rounded-[40px] font-bold text-[16px] uppercase tracking-[1px] text-text bg-white/25 dark:bg-surface-lighter/50 border-2 border-primary/40 hover:border-primary backdrop-blur-xl transition-all duration-300 shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group cursor-pointer">
+                <span>Sign In</span>
+                <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-1 transition-transform" />
+              </button>
+            </Link>
+          </motion.div>
+        </div>
+
+        <motion.div variants={itemVariants} className="flex-1 w-full max-w-lg lg:max-w-[500px] mx-auto lg:mx-0 perspective-1000 relative">
+          <motion.div 
+            whileHover={{ rotateY: -5, rotateX: 5, scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="w-full rounded-2xl overflow-hidden glass-card p-2 border-primary/20 shadow-2xl shadow-primary/20 relative z-10"
+          >
+            <div className="relative overflow-hidden rounded-xl max-h-[380px] sm:max-h-[400px]">
+              <img 
+                src="/water_conserve.webp" 
+                alt="Dashboard Animation" 
+                className="w-full h-full object-cover object-center"
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-8 pb-3 text-center">
+                <span className="text-white text-xs sm:text-sm md:text-base font-extrabold tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                  Save Water • Save Nature
+                </span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Kinetic Badge */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 0.5, type: "spring", bounce: 0.5 }}
+            className="absolute -bottom-6 -right-6 sm:-bottom-10 sm:-right-10 z-20"
+          >
+            <Link to="/login" className="kinetic-badge bg-surface/90 backdrop-blur-md shadow-2xl shadow-primary/30 border border-primary/20">
+              <div className="badge-bg"></div>
+              <div className="badge-text">
+                <svg viewBox="0 0 100 100" className="w-[90%] h-[90%]">
+                  <defs>
+                    <path
+                      id="circlePath"
+                      d="M 50, 50 m -38, 0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0"
+                    ></path>
+                  </defs>
+                  <text
+                    fontSize="9.5"
+                    fontWeight="700"
+                    fill="currentColor"
+                    letterSpacing="1.2"
+                  >
+                    <textPath href="#circlePath" startOffset="0%">
+                      {(() => {
+                        const badgeTexts = {
+                          hi: 'स्मार्ट वाटर बिलिंग • इंटेलिजेंट एनालिटिक्स • ',
+                          bn: 'স্মার্ট ওয়াটার বিলিং • ইন্টেলিজেন্ট অ্যানালিটিক্স • ',
+                          te: 'స్మార్ట్ వాటర్ బbilling • ఇంటెలిజెంట్ అనలిటిక్స్ • ',
+                          mr: 'स्मार्ट वॉटर बिलिंग • इंटेलिजंट ॲनालिटिक्स • ',
+                          ta: 'ஸ்மார்ட் வாட்டர் பில்லிங் • இன்டலிஜென்ட் அனலிடிக்ஸ் • ',
+                          ur: 'سمارٹ واٹر بلنگ • ذہین تجزیات • ',
+                          gu: 'સ્માર્ટ વોટર બિલિંગ • ઈન્ટેલિજન્ટ એનાલિટિક્સ • ',
+                          kn: 'ಸ್ಮಾರ್ಟ್ ವಾಟರ್ ಬಿಲ್ಲಿಂಗ್ • ಇಂಟೆಲಿಜೆಂಟ್ ಅನಾಲಿಟಿಕ್ಸ್ • ',
+                          ml: 'സ്മാർട്ട് വാട്ടർ ബില്ലിംഗ് • അനലിറ്റിക്സ് • ',
+                          pa: 'ਸਮਾਰਟ ਵਾਟਰ ਬਿਲਿੰਗ • ਇੰਟੈਲੀਜੈਂਟ ਐਨਾਲਿਟਿਕਸ • ',
+                          or: 'ସ୍ମାର୍ଟ ଜଳ ବିଲିଂ • ଇଣ୍ଟେଲିଜେଣ୍ଟ ଆନାଲିଟିକ୍ସ • ',
+                          as: 'স্মাৰ্ট পানী বিলিং • বুদ্ধিমত্তা বিশ্লেষণ • '
+                        };
+                        return badgeTexts[currentLang] || 'SMART WATER BILLING • INTELLIGENT ANALYTICS • ';
+                      })()}
+                    </textPath>
+                  </text>
+                </svg>
+              </div>
+              <div className="badge-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  className="w-[22%] h-[22%]"
+                >
+                  <path
+                    d="M6 18L18 6M18 6H8M18 6V16"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  ></path>
+                </svg>
+              </div>
+            </Link>
+          </motion.div>
+        </motion.div>
+      </motion.section>
+
+      {/* Infinite Marquee Section */}
+      <div className="w-full border-y border-border/80 bg-surface/60 backdrop-blur-md py-4 z-10 relative">
+        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-20 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-20 pointer-events-none" />
+        
+        <div className="marquee-container">
+          <div className="marquee-content">
+            {slogans.map((slogan, idx) => (
+              <span key={idx} className="flex-shrink-0 flex items-center gap-2 pr-12 text-sm md:text-base font-bold text-text tracking-wider uppercase">
+                <span className="text-primary font-extrabold text-lg">•</span> {slogan}
+              </span>
+            ))}
+          </div>
+          <div className="marquee-content" aria-hidden="true">
+            {slogans.map((slogan, idx) => (
+              <span key={`dup-${idx}`} className="flex-shrink-0 flex items-center gap-2 pr-12 text-sm md:text-base font-bold text-text tracking-wider uppercase">
+                <span className="text-primary font-extrabold text-lg">•</span> {slogan}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <motion.section 
+        id="features"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+        className="z-10 w-full px-6 max-w-6xl mx-auto pt-10 pb-6 md:pt-14 md:pb-8 relative scroll-mt-24"
+      >
+        <div className="text-center mb-8 md:mb-12">
+          <motion.h2 
+            variants={fadeUpVariants} 
+            className="text-3xl md:text-5xl font-bold text-text mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2"
+          >
+            <span>Why Choose</span>
+            <span className="loader-text-inherit relative inline-block align-middle">
+              <span className="outline-layer">AquaTrack</span>
+              <span className="fill-layer">AquaTrack</span>
+            </span>
+            <span>?</span>
+          </motion.h2>
+          <motion.p variants={fadeUpVariants} className="text-text/90 max-w-xl mx-auto">Everything you need to manage community water distribution transparently and efficiently.</motion.p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 justify-items-center">
+          <FeaturePanelCard
+            icon={BarChart3}
+            title="USAGE ANALYTICS"
+            subtitle="Interactive dashboards and real-time insights to track individual and community water trends."
+            blobsColor={[
+              "rgba(59, 130, 246, 0.6)",
+              "rgba(139, 92, 246, 0.7)",
+              "rgba(6, 182, 212, 0.7)",
+              "rgba(14, 165, 233, 0.3)",
+              "rgba(37, 99, 235, 0.4)"
+            ]}
+            cardType="blue"
+          />
+          <FeaturePanelCard
+            icon={Users}
+            title="FAIR BILLING ALGORITHM"
+            subtitle="Proportional cost allocation ensuring residents only pay for exactly what they use, minimizing disputes."
+            blobsColor={[
+              "rgba(16, 185, 129, 0.6)",
+              "rgba(20, 184, 166, 0.7)",
+              "rgba(34, 197, 94, 0.7)",
+              "rgba(45, 212, 191, 0.3)",
+              "rgba(5, 150, 105, 0.4)"
+            ]}
+            cardType="green"
+          />
+          <FeaturePanelCard
+            icon={Shield}
+            title="ANOMALY & LEAK ALERTS"
+            subtitle="Automated statistical analysis flags abnormal usage spikes, triggering instant email and dashboard alerts."
+            blobsColor={[
+              "rgba(244, 63, 94, 0.6)",
+              "rgba(239, 68, 68, 0.7)",
+              "rgba(249, 115, 22, 0.7)",
+              "rgba(251, 146, 60, 0.3)",
+              "rgba(225, 29, 72, 0.4)"
+            ]}
+            cardType="red"
+          />
+        </div>
+      </motion.section>
+
+
+
+
+
+      {/* Footer */}
+      <footer className="w-full bg-white/70 dark:bg-[#071324] text-text border-t border-primary/25 backdrop-blur-xl z-10 mt-6 md:mt-10 relative py-6 px-4 sm:px-8 lg:px-12 shadow-lg shadow-primary/5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
+          {/* Logo & Copyright */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl overflow-hidden border border-primary/40 bg-surface shadow-md shadow-primary/20 flex items-center justify-center">
+                <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
+              </div>
+              <span className="text-lg font-black tracking-tight text-text">
+                Aqua<span className="text-primary font-black">Track</span>
+              </span>
+            </div>
+            <span className="hidden sm:inline text-text-muted/60">•</span>
+            <p className="text-xs text-text-muted font-medium">
+              © {new Date().getFullYear()} AquaTrack Systems. All rights reserved.
+            </p>
+          </div>
+
+          {/* Background Control Segmented Widget */}
+          <div className="hidden md:flex relative items-center p-1 rounded-full bg-surface-lighter/40 border border-border/20 backdrop-blur-md shadow-lg">
+            <button
+              onClick={() => handleBgTypeChange('modern')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
+                bgType === 'modern'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                  : 'text-text-muted hover:text-text'
+              }`}
+              title="Modern Background"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Modern</span>
+            </button>
+            <button
+              onClick={() => handleBgTypeChange('liquid')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
+                bgType === 'liquid'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                  : 'text-text-muted hover:text-text'
+              }`}
+              title="Liquid Background"
+            >
+              <Droplet className="w-3.5 h-3.5" />
+              <span>Liquid</span>
+            </button>
+          </div>
+
+        </div>
+      </footer>
+
+      {/* Liquid Gooey SVG Filter */}
+      <svg xmlns="http://www.w3.org/2000/svg" version="1.1" style={{ width: 0, height: 0, position: 'absolute', pointerEvents: 'none', opacity: 0 }}>
+        <defs>
+          <filter id="liquid">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="liquid" />
+          </filter>
+        </defs>
+      </svg>
+    </div>
+  );
+}
