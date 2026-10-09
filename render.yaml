@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: aquatrack-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DB_HOST
+        fromDatabase:
+          name: aquatrack-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: aquatrack-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: aquatrack-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: aquatrack-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: aquatrack-db
+          property: password
+      - key: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+        value: org.postgresql.Driver
+      - key: SPRING_JPA_DIALECT
+        value: org.hibernate.dialect.PostgreSQLDialect
+      - key: ALLOWED_ORIGINS
+        value: https://aquatrack-git-main-dubeynitin65-2581s-projects.vercel.app,http://localhost:5173
+
+databases:
+  - name: aquatrack-db
+    databaseName: aquatrack
+    user: aquatrack_user
+    plan: free
+    region: singapore
